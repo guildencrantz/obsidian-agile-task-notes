@@ -140,7 +140,8 @@ export class VaultHelper {
             .replace(/{{TASK_STATE}}/g, task.state)
             .replace(/{{TASK_TYPE}}/g, task.type.replace(/ /g,''))
             .replace(/{{TASK_ASSIGNEDTO}}/g, task.assignedTo)
-            .replace(/{{TASK_LINK}}/g, task.link);
+            .replace(/{{TASK_LINK}}/g, task.link)
+            .replace(/{{TASK_DUE}}/g, task.due);
 
     if (task.desc != null) {
       content = content.replace(/{{TASK_DESCRIPTION}}/g, task.desc);

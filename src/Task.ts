@@ -11,8 +11,9 @@ export class Task {
   public assignedTo: string;
   public link: string;
   public desc: string;
+  public due: string;
 
-  constructor(id: string, state: string, title: string, type: string, assignedTo: string, link: string, desc: string) {
+  constructor(id: string, state: string, title: string, type: string, assignedTo: string, link: string, desc: string, due?: string) {
     this.id = id;
     this.state = state;
     this.title = title;
@@ -20,5 +21,6 @@ export class Task {
     this.assignedTo = assignedTo;
     this.link = link;
     this.desc = desc;
+    this.due = due;
   }
 }

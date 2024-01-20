@@ -29,7 +29,7 @@ export const JIRA_DEFAULT_SETTINGS: JiraSettings = {
 }
 
 export class JiraClient implements ITfsClient{
-  
+
   clientName: string = 'Jira';
 
   public async update(settings: AgileTaskNotesSettings): Promise<void> {
@@ -43,7 +43,7 @@ export class JiraClient implements ITfsClient{
         headers.Authorization = `Basic ${encoded64Key}`;
     } else if(settings.jiraSettings.authmode = 'bearer') {
         headers.Authorization = `Bearer ${settings.jiraSettings.apiToken}`;
-    } 
+    }
 
     const BaseURL = `https://${settings.jiraSettings.baseUrl}/rest/agile/1.0`;
 
@@ -58,7 +58,7 @@ export class JiraClient implements ITfsClient{
           .replace(/[^a-zA-Z0-9 -]/g, '')
           .replace(/\s+/g, '-')
           .replace(/-+/g, '-');
-      
+
         const sprintIdentifier = settings.jiraSettings.useSprintName ? currentSprintName : currentSprintId;
 
         const normalizedFolderPath =  normalizePath(settings.targetFolder + '/sprint-' + sprintIdentifier);
@@ -68,10 +68,10 @@ export class JiraClient implements ITfsClient{
 
         let tasks:Array<Task> = [];
         let issueResponseList: Array<RequestUrlResponse> = [];
-        
+
         if (settings.teamLeaderMode) {
           issueResponseList[0] = await requestUrl(
-            { 
+            {
               method: 'GET',
               headers: headers,
               url: `${BaseURL}/board/${settings.jiraSettings.boardId}/sprint/${currentSprintId}/issue?maxResults=1000`
@@ -81,16 +81,16 @@ export class JiraClient implements ITfsClient{
         } else {
           let usernames = settings.jiraSettings.usernames.split(',').map((username:string) => username.trim().replace("\'", "\\'"));
 
-          issueResponseList = await Promise.all(usernames.map((username: string) => 
+          issueResponseList = await Promise.all(usernames.map((username: string) =>
           requestUrl(
-            { 
-              method: 'GET', 
-              headers: headers, 
-              url: `${BaseURL}/board/${settings.jiraSettings.boardId}/sprint/${currentSprintId}/issue?jql=assignee=\"${username}\"&maxResults=1000` 
+            {
+              method: 'GET',
+              headers: headers,
+              url: `${BaseURL}/board/${settings.jiraSettings.boardId}/sprint/${currentSprintId}/issue?jql=assignee=\"${username}\"&maxResults=1000`
             })
         ));
         }
-        
+
         issueResponseList.forEach((issueResponse: any) => {
           issueResponse.json.issues.forEach((issue:any) => {
 
@@ -101,28 +101,29 @@ export class JiraClient implements ITfsClient{
             }
 
             tasks.push(new Task(
-              issue.key, 
-              issue.fields["status"]["name"], 
-              issue.fields["summary"], 
-              issue.fields["issuetype"]["name"], 
-              assigneeName, 
-              `https://${settings.jiraSettings.baseUrl}/browse/${issue.key}`, 
-              issue.fields["description"])
-            );
+              issue.key,
+              issue.fields["status"]["name"],
+              issue.fields["summary"],
+              issue.fields["issuetype"]["name"],
+              assigneeName,
+              `https://${settings.jiraSettings.baseUrl}/browse/${issue.key}`,
+              issue.fields["description"],
+              issue.fields["duedate"]
+            ));
           });
         });
 
         // Create markdown files based on remote task in current sprint
         await Promise.all(VaultHelper.createTaskNotes(normalizedFolderPath, tasks, settings.noteTemplate));
-        
+
         if (settings.createKanban) {
-          
+
           // Get the column names from the Jira board
           const boardConfigResponse = await requestUrl(
-            { 
-              method: 'GET', 
-              headers: headers, 
-              url: `${BaseURL}/board/${settings.jiraSettings.boardId}/configuration` 
+            {
+              method: 'GET',
+              headers: headers,
+              url: `${BaseURL}/board/${settings.jiraSettings.boardId}/configuration`
             }
           );
           const columnIds = boardConfigResponse.json.columnConfig.columns.map((column:any) => column.name);
@@ -145,47 +146,48 @@ export class JiraClient implements ITfsClient{
 
         if (settings.teamLeaderMode) {
           issueResponseList[0] = await requestUrl(
-            { 
+            {
               method: 'GET',
               headers: headers,
               url: `${BaseURL}/board/${settings.jiraSettings.boardId}/issue?maxResults=1000`
             }
           );
-          
+
         } else {
           let usernames = settings.jiraSettings.usernames.split(',').map((username:string) => username.trim().replace("\'", "\\'"));
-          issueResponseList = await Promise.all(usernames.map((username: string) => 
+          issueResponseList = await Promise.all(usernames.map((username: string) =>
           requestUrl(
-            { 
+            {
               method: 'GET',
               headers: headers,
               url: `${BaseURL}/board/${settings.jiraSettings.boardId}/issue?jql=assignee=\"${username}\"&maxResults=1000`
             })
-          ));  
+          ));
         }
-        
-        
+
+
         issueResponseList.forEach((issueResponse: RequestUrlResponse) => {
           issueResponse.json.issues.forEach((issue:any) => {
 
             if (!settings.jiraSettings.excludeBacklog || settings.jiraSettings.excludeBacklog && issue.fields["status"]["name"] !== 'Backlog') {
-              
+
               let assigneeName = 'Unassigned'
               let assignee = issue.fields["assignee"];
               if (assignee !== null) {
                 assigneeName = assignee["displayName"];
               }
-              
+
               let taskObj = new Task(
-                  issue.key, 
-                  issue.fields["status"]["name"], 
-                  issue.fields["summary"], 
-                  issue.fields["issuetype"]["name"], 
-                  assigneeName, 
-                  `https://${settings.jiraSettings.baseUrl}/browse/${issue.key}`, 
-                  issue.fields["description"]
+                  issue.key,
+                  issue.fields["status"]["name"],
+                  issue.fields["summary"],
+                  issue.fields["issuetype"]["name"],
+                  assigneeName,
+                  `https://${settings.jiraSettings.baseUrl}/browse/${issue.key}`,
+                  issue.fields["description"],
+                  issue.fields["duedate"]
               );
-  
+
               if (issue.fields["resolution"] != null) {
                 completedTasks.push(taskObj);
               } else {
@@ -194,11 +196,11 @@ export class JiraClient implements ITfsClient{
             }
           });
         });
-        
+
         // Create markdown files
         await Promise.all(VaultHelper.createTaskNotes(normalizedBaseFolderPath, activeTasks, settings.noteTemplate));
         await Promise.all(VaultHelper.createTaskNotes(normalizedCompletedfolderPath, completedTasks, settings.noteTemplate));
-        
+
         // Move pre-existing notes that became resolved state into the Completed folder and vise versa
         const completedTaskNoteFiles = completedTasks.map(task => VaultHelper.getFileByTaskId(settings.targetFolder, task.id)).filter((file): file is TFile => !!file);
         completedTaskNoteFiles.forEach(file => app.vault.rename(file, normalizePath(completedFolder + file.name)));
@@ -209,10 +211,10 @@ export class JiraClient implements ITfsClient{
 
           // Get the column names from the Jira board
           const boardConfigResponse = await requestUrl(
-            { 
-              method: 'GET', 
-              headers: headers, 
-              url: `${BaseURL}/board/${settings.jiraSettings.boardId}/configuration` 
+            {
+              method: 'GET',
+              headers: headers,
+              url: `${BaseURL}/board/${settings.jiraSettings.boardId}/configuration`
             }
           );
           var columnIds = boardConfigResponse.json.columnConfig.columns.map((column:any) => column.name);
